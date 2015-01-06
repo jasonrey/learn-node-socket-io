@@ -14,7 +14,8 @@ app.get('/', function(req, res, next) {
 
 app.set('port', process.env.PORT || 3000);
 
-var connections = {};
+var connections = {},
+    map = {};
 
 io.on('connection', function(socket) {
     if (!connections[socket.id]) {
@@ -24,14 +25,28 @@ io.on('connection', function(socket) {
         };
     }
 
+    socket.on('disconnect', function() {
+        delete map[connections[socket.id].name];
+        delete connections[socket.id];
+    });
+
     console.log(socket.id + ' connected.');
 
-    socket.on('registerName', function(name) {
+    socket.on('registerName', function(name, callback) {
+        if (map[name]) {
+            return callback(false, 'Name has been taken.');
+        } else {
+            callback(true);
+        }
+
         console.log(socket.id + ' has registered as ' + name + '.');
 
         connections[socket.id].name = name;
+        map[name] = socket.id;
 
         socket.emit('welcome', 'Welcome ' + name + '.');
+
+        socket.broadcast.emit('join', name + ' has joined the room.');
     });
 
     socket.on('sendMessage', function(msg) {
@@ -39,6 +54,17 @@ io.on('connection', function(socket) {
             name: connections[socket.id].name,
             msg: msg
         });
+    });
+
+    socket.on('whisper', function(name, msg) {
+        if (!map[name]) {
+            return;
+        }
+
+        var target = connections[map[name]].socket;
+
+        target.emit('whisperReceive', connections[socket.id].name, msg);
+        socket.emit('whisperSend', connections[socket.id].name, name, msg);
     });
 });
 

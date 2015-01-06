@@ -6,8 +6,20 @@ $(function() {
                 $('.lines').append('<li>' + msg + '</li>');
             });
 
+            socket.on('join', function(msg) {
+                $('.lines').append('<li>' + msg + '</li>');
+            });
+
             socket.on('broadcastMessage', function(result) {
                 $('.lines').append('<li>' + result.name + ': ' + result.msg + '</li>');
+            });
+
+            socket.on('whisperSend', function(name, to, msg) {
+                $('.lines').append('<li class="whisper">' + name + ' > ' + to + ': ' + msg + '</li>');
+            });
+
+            socket.on('whisperReceive', function(name, msg) {
+                $('.lines').append('<li class="whisper">' + name + ': ' + msg + '</li>');
             });
         }
 
@@ -20,14 +32,22 @@ $(function() {
     $('.popup button').on('click', function() {
         name = $('.popup input').val();
 
+        $('.form-group').find('.alert').remove();
+
         if (name) {
             socket = io();
 
-            socket.emit('registerName', name);
+            socket.emit('registerName', name, function(success, msg) {
+                if (success) {
+                    initSocket();
 
-            initSocket();
-
-            $('.popup').remove();
+                    $('.popup').remove();
+                } else {
+                    $('.form-group').prepend('<div class="alert alert-danger">' + msg + '</div>');
+                }
+            });
+        } else {
+            $('.form-group').prepend('<div class="alert alert-danger">Name is needed.</div>');
         }
     });
 
@@ -35,9 +55,21 @@ $(function() {
         if (event.keyCode == 13) {
             event.preventDefault();
 
-            socket.emit('sendMessage', $(this).text());
+            var input = $(this),
+                text = input.text();
 
-            $(this).text('');
+            input.text('');
+
+            if (text.substr(0, 1) === '>') {
+                var splitted = text.split(' '),
+                    target = splitted.splice(0, 1)[0].substr(1),
+                    text = splitted.join(' ');
+
+                socket.emit('whisper', target, text);
+                return;
+            }
+
+            socket.emit('sendMessage', text);
         }
     });
 });

@@ -26,6 +26,10 @@
     font-size: 18px;
 }
 
+.lines li.whisper {
+    color: #3c763d;
+}
+
 .lines li:before {
     content: '> ';
 }
